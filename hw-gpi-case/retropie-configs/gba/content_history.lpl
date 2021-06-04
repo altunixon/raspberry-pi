@@ -1,0 +1,59 @@
+{
+  "version": "1.4",
+  "default_core_path": "",
+  "default_core_name": "",
+  "label_display_mode": 0,
+  "right_thumbnail_mode": 0,
+  "left_thumbnail_mode": 0,
+  "sort_mode": 2,
+  "items": [
+    {
+      "path": "/home/alt/RetroPie/roms/gba/Breath of Fire 2 (U)(Mode7).zip",
+      "label": "",
+      "core_path": "/opt/retropie/libretrocores/lr-gpsp/gpsp_libretro.so",
+      "core_name": "gpSP",
+      "crc32": "",
+      "db_name": ""
+    },
+    {
+      "path": "/home/alt/RetroPie/roms/gba/Castlevania - Aria of Sorrow (U)(GBATemp).zip",
+      "label": "",
+      "core_path": "/opt/retropie/libretrocores/lr-gpsp/gpsp_libretro.so",
+      "core_name": "gpSP",
+      "crc32": "",
+      "db_name": ""
+    },
+    {
+      "path": "/home/alt/RetroPie/roms/gba/Natural 2 Duo (J)(KaMX).zip",
+      "label": "",
+      "core_path": "/opt/retropie/libretrocores/lr-gpsp/gpsp_libretro.so",
+      "core_name": "gpSP",
+      "crc32": "",
+      "db_name": ""
+    },
+    {
+      "path": "/home/alt/RetroPie/roms/gba/Tsukihime (J).zip",
+      "label": "",
+      "core_path": "/opt/retropie/libretrocores/lr-gpsp/gpsp_libretro.so",
+      "core_name": "gpSP",
+      "crc32": "",
+      "db_name": ""
+    },
+    {
+      "path": "/home/alt/RetroPie/roms/gba/Angelic Layer (J)(Independent).zip",
+      "label": "",
+      "core_path": "/opt/retropie/libretrocores/lr-gpsp/gpsp_libretro.so",
+      "core_name": "gpSP",
+      "crc32": "",
+      "db_name": ""
+    },
+    {
+      "path": "/home/alt/RetroPie/roms/gba/Breath of Fire (U)(Mode7).zip",
+      "label": "",
+      "core_path": "/opt/retropie/libretrocores/lr-gpsp/gpsp_libretro.so",
+      "core_name": "gpSP",
+      "crc32": "",
+      "db_name": ""
+    }
+  ]
+}
