@@ -1,7 +1,7 @@
 ## Community Images
 See the bottom of this file, at Resources, the UserGroup's 4.5.1-v1.2 image seems promising
 
-## Raspbian
+## Raspbian \(Works GREAT!\)
 ### 1. Flash raspbian \(-lite preferable\) image to your sd card
 
 ### 2. ~Expand the root filesystem~ Raspbian now automatically expands the filesystem so that step is no longer necessary.
@@ -103,11 +103,27 @@ or by using `raspi-config` as described in the [Memory Split] page.</br>
 
 
 ### 8. Further Optimizations:
-On Debian Jessie add ` consoleblank=0` to the existing line in `/boot/cmdline.txt` (with a space before it so it's an additional parameter).</br>
-This prevents the screenblanker kicking in. With it, runcommand dialog is always displayed.
-There is also a gui option in `RetroPie-Setup -> Configuration / Tools -> Raspbian Tools` to disable the blanker, but it doesn't work in Jessie due to a Debian bug.
+- On Debian Jessie add ` consoleblank=0` to the existing line in `/boot/cmdline.txt` (with a space before it so it's an additional parameter).</br>
+  This prevents the screenblanker kicking in. With it, runcommand dialog is always displayed.
+  There is also a gui option in `RetroPie-Setup -> Configuration / Tools -> Raspbian Tools` to disable the blanker, but it doesn't work in Jessie due to a Debian bug.
+- If you run the scraper from the GPi Case, the process could stop when the devices goes into Power Saver mode. The tip is to disable “Power Saver”. To do so you must open the EmulationStation main menu, pressing Start, open Other Settings submenu, finally set Power Saver Modes to Disabled.
 
-### 9. [FAQ]
+### 9. Update controller framework [sinisterspatula]
+- Install xboxdrv:
+  ```bash
+  sudo ./RetroPie-Setup/retropie_setup.sh
+  ```
+  From the install menu, select manage packages > driver > xboxdrv > install from source.</br>
+  **Note**: Its gonna take takes over 1 hour to compile. so do this after you have every thing setup, </br>
+  it also helps to kill emulationstation before compile.</br>
+  Exit the setup menu.
+- Install the Controls Updater Menu:
+  ```bash
+  cd && cd RetroPie/retropiemenu && wget -O migrate-controllertools.sh  https://raw.githubusercontent.com/SinisterSpatula/Gpi3/master/migrate-controllertools.sh && sudo chmod 775 migrate-controllertools.sh && sudo rm control_updater_menu.sh
+  sudo /home/pi/RetroPie/retropiemenu/migrate-controllertools.sh
+  ```
+
+### 99. [FAQ]
 - Q: How doth one [Boot to EmulationStation]?</br>
   A: In retropie `setup script >> Configuration / tools >> autostart`:
   - Start EmulationStation at Boot: Boots into EmulationStation.
@@ -295,3 +311,4 @@ Download the patch ZIP file from the [Retroflag downloads page] or [directly]. U
 [Link to Gpi user group Image]: https://drive.google.com/drive/folders/1a4PJI1axHDaKanj2wIbSsvKj3PHbHqL9
 [Link to Lakka Image]: http://le.builds.lakka.tv/RPi.GPICase.arm/Lakka-RPi.GPICase.arm-2.3.1.img.gz
 [Runcommand]: https://retropie.org.uk/docs/Runcommand/
+[sinisterspatula]: https://sinisterspatula.github.io/RetroflagGpiGuides/
