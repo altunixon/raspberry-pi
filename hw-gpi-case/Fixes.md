@@ -58,7 +58,7 @@
 ### \[ERROR\] XboxdrvDaemon::launch\_controller\_thread\(\): USB device disappeared before it could be opened
 The driver for the xbox controller built into the kernel (xpad) seems to be quite broken.
 so let's disable it and use xboxdrv instead.
-- Blacklist xpad kernel driver
+- Blacklist xpad kernel driver -> this results in the gpicase controller not get recognized
   ```bash
   sudo bash -c 'echo "blacklist xpad" >> /etc/modprobe.d/blacklist.conf'
   sudo rmmod xpad
@@ -68,12 +68,12 @@ so let's disable it and use xboxdrv instead.
 ### lvl0: VolumeControl::init\(\) - [Failed to find mixer elements!]
 A recent change in [Raspbian Buster's kernel/firmware updates for May 2020] is causing Audio/Sound issues for RPI users - users that installed the 4.6 image or installed RetroPie manually on-top of Raspbian Buster.</br>
 Symptoms include:
-- Error messages showing when a game is launched (lvl0: VolumeControl::init() - Failed to find mixer elements).
+- Error messages showing when a game is launched \(lvl0: VolumeControl::init\(\) - Failed to find mixer elements\).
 - Sound missing in EmulationStation and/or games.
 - System Volume slider stuck at 0% in EmulationStation's Sound settings.
 
 To verify if you're affected by the audio changes, you can check your Raspbian Linux kernel version with `uname -r`, if it's 4.19.118 or later, your system is affected.
-To solve this issue(s), here is a list of steps need to be taken:
+To solve this issue\(s\), here is a list of steps need to be taken:
 - [update your RetroPie-Setup] installation.
 - use the Audio menu in RetroPie to choose your Audio output \(HDMI/Headphones\).</br>
   This will set the default Sound card/device for your system, but wouldn't always solve the problem of missing audio in EmulationStation.
@@ -84,7 +84,7 @@ To solve this issue(s), here is a list of steps need to be taken:
   HDMI|Audio Card: Default, Audio Device: PCM, OMX Audio Device: HDMI|Audio Card: Default, Audio Device: HDMI, OMX Audio Device: ALSA
   Headphone Jack|Audio Card: Default, Audio Device: PCM, OMX Audio Device: Local|Audio Card: Default, Audio Device: Headphone, OMX Audio Device: ALSA
 Notes:
-- If you're using an external (USB/I2S/etc.) soundcard, you might be affected by the change - the system configures now (at least) 2 sound cards instead of 1 (as it was the default before the update). If you've disabled the on-board sound, then you shouldn't be affected.
+- If you're using an external \(USB/I2S/etc.\) soundcard, you might be affected by the change - the system configures now \(at least\) 2 sound cards instead of 1 \(as it was the default before the update\). If you've disabled the on-board sound, then you shouldn't be affected.
 - RetroPie users still using an a system based on Raspbian Strech should not be affected by this change, since Raspbian no longer provides any updates for this version.
 - Optional if you wish to revert to the previous Audio configuration, then you can add to `/boot/cmdline.txt`
   `snd_bcm2835.enable_hdmi=1 snd_bcm2835.enable_headphones=1 snd_bcm2835.enable_compat_alsa=1`
