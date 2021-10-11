@@ -1,0 +1,5 @@
+*.srm
+*.sav
+*.mcd
+*.cht
+SL*.0*

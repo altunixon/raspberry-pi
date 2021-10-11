@@ -1,0 +1,95 @@
+---
+- name: 'Provision new raspberry pi server'
+  hosts: "{{ cmd_host | default('gpi') }}"
+  become: true
+  become_user: root
+  become_method: sudo
+  gather_facts: yes
+  ignore_errors: false
+
+  vars:
+    ansible_python_interpreter: '/usr/bin/python3'
+    flag_debug: 1
+    deploy_key: '{{ lookup("env", "HOME") + "/.ssh/id_ed25519" }}'
+    deploy_data: '{{ lookup("env", "HOME") + "/RetroPie-Data" }}'
+    retropie_path: '/opt/retropie'
+
+  vars_prompt:
+  - name: deploy_usr
+    prompt: "Enter remote username to deploy customized retropie data"
+    private: no
+
+  tasks:
+    - set_fact:
+        home_path: '/home/{{ deploy_usr }}'
+        bios_path: '/home/{{ deploy_usr }}/RetroPie/BIOS'
+        roms_path: '/home/{{ deploy_usr }}/RetroPie/roms'
+        pcsx_memcards: '{{ retropie_path }}/emulators/pcsx-rearmed/memcards'
+        pcsx_sstates: '{{ retropie_path }}/configs/psx/pcsx/sstates'
+        pcsx_bios: '{{ retropie_path }}/emulators/pcsx-rearmed/bios'
+        data_path: '/home/{{ deploy_usr }}/RetroPie-Data'
+
+    - set_fact:
+        bios_data: '{{ data_path }}/BIOS'
+        roms_data: '{{ data_path }}/roms'
+        mmcd_data: '{{ data_path }}/pcsx-memcards'
+        ssts_data: '{{ data_path }}/pcsx-sstates'
+
+    - name: "Create Retropie-Data and backup folders"
+      file:
+        path: '{{ data_path }}'
+        state: directory
+
+    - name: Migrate data
+      include_tasks: func-migrate.yml
+      vars:
+        dst_path: '{{ item.dst }}'
+        src_path: '{{ item.src }}'
+      with_items:
+        - { src: '{{ bios_path }}', dst: '{{ bios_data }}' } 
+        - { src: '{{ roms_path }}', dst: '{{ roms_data }}' } 
+        - { src: '{{ pcsx_memcards }}', dst: '{{ mmcd_data }}' } 
+        - { src: '{{ pcsx_sstates }}', dst: '{{ ssts_data }}' } 
+      register: migrate_data
+
+    - name: "Sync Retropie-Data"
+      local_action:
+        module: ansible.builtin.command
+        argv:
+          - rsync
+          - '-avH'
+          - '--checksum'
+          - '-e'
+          - 'ssh -i {{ deploy_key }}'
+          - '--exclude-from={{ playbook_dir }}/rsync-exclude.txt' 
+          - '--include-from={{ playbook_dir }}/rsync-include.txt' 
+          - '{{ deploy_data }}/'
+          - '{{ deploy_usr }}@{{ hostvars[inventory_hostname]["ansible_default_ipv4"]["address"] }}:{{ data_path }}/'
+
+    - name: "Link resources"
+      file:
+        state: link
+        src: '{{ item.src }}'
+        dest: '{{ item.dst }}'
+      with_items:
+        - { src: '{{ bios_data }}', dst: '{{ bios_path }}'}
+        - { src: '{{ roms_data }}', dst: '{{ roms_path }}'}
+        - { src: '{{ mmcd_data }}', dst: '{{ pcsx_memcards }}'}
+        - { src: '{{ ssts_data }}', dst: '{{ pcsx_sstates }}'}
+
+    - name: "Link pcsx bioses"
+      shell: 'for x in $(ls {{ bios_path }}/scph*); do y=$(echo "$x" | awk -F "/" "{print $NF}"); [ ! -s "{{ pcsx_bios }}/$y" ] && ln -s "$x" {{ pcsx_bios }}; done'
+
+    - name: "Set permissions"
+      file:
+        state: directory
+        recurse: yes
+        owner: '{{ deploy_usr }}'
+        group: '{{ deploy_usr }}'
+        path: '{{ item }}'
+      with_items:
+        - '{{ data_path }}'
+        - '{{ home_path }}'
+        - '{{ retropie_path }}'
+        - '{{ bkup_path }}'
+

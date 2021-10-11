@@ -15,7 +15,8 @@ BACKTITLE=" MIGRATE GPi xbox control scripts "
 _retro_user=${1:-pi}
 _retro_conf="/opt/retropie/configs/all"
 _retro_xbox="/opt/retropie/supplementary/xboxdrv/bin"
-_retro_tool="/home/$_retro_user/RetroPie/retropiemenu/gpitools"
+_retro_menu="/home/$_retro_user/RetroPie/retropiemenu"
+_retro_tool="$_retro_menu/gpitools"
 #IFS=';'
 
 # Welcome
@@ -66,22 +67,22 @@ sudo wget -O "$_retro_conf/uncommand-onstart.sh" https://raw.githubusercontent.c
 sudo wget -O "$_retro_conf/boxdrvstart.sh" https://raw.githubusercontent.com/SinisterSpatula/Gpi3/master/xboxdrvstart.sh
 sudo wget -O "$_retro_conf/boxdrvend.sh" https://raw.githubusercontent.com/SinisterSpatula/Gpi3/master/xboxdrvend.sh
 sudo chmod 644 "$_retro_conf/*.sh"
-sudo chown $_retro_user:$_retro_user runcommand-on*
+sudo chown -R $_retro_user:$_retro_user "$_retro_conf"
 sudo chmod 775 "$_retro_conf/boxdrvstart.sh"
 sudo chmod 775 "$_retro_conf/boxdrvend.sh"
-cd
-cd "$_retro_xbox"
+cd; cd "$_retro_xbox"
 sudo wget -O "$_retro_xbox/quit.sh" https://raw.githubusercontent.com/SinisterSpatula/Gpi3/master/quit.sh
 sudo chmod 775 "$_retro_xbox/quit.sh"
 
-[ -d "/home/$_retro_user/RetroPie/retropiemenu/Controllertools" ] && sudo rm -R "/home/$_retro_user/RetroPie/retropiemenu/Controllertools"
+[ -d "$_retro_menu/Controllertools" ] && sudo rm -R "$_retro_menu/Controllertools"
 sudo mkdir -p "$_retro_tool"
 cd
 cd "$_retro_tool"
 sudo wget -O "$_retro_tool/control_updater_menu.sh" https://raw.githubusercontent.com/SinisterSpatula/Gpi3/master/control_updater_menu.sh
 sudo chmod 775 "$_retro_tool/control_updater_menu.sh"
-[ -f "/home/$_retro_user/RetroPie/retropiemenu/control_updater_menu.sh" ] && sudo rm /home/$_retro_user/RetroPie/retropiemenu/control_updater_menu.sh
-[ -f "/home/$_retro_user/RetroPie/retropiemenu/migrate-controllertools.sh" ] && sudo rm /home/$_retro_user/RetroPie/retropiemenu/migrate-controllertools.sh
+[ -f "$_retro_menu/control_updater_menu.sh" ] && sudo rm "$_retro_menu/control_updater_menu.sh"
+[ -f "$_retro_menu/migrate-controllertools.sh" ] && sudo rm "$_retro_menu/migrate-controllertools.sh"
+
 echo "-------------------------------------"
 echo "|Migrated to new Controls Framework.|"
 echo "|  Please restart emulation station |"
@@ -89,28 +90,18 @@ echo "|  new location is GPi-Tools        |"
 echo "-------------------------------------"
 sleep 20s
   else
-    echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-    echo ".                                      ."
-    echo ".FAILED! File not available or wifi off."
-    echo ".                                      ."
-    echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+    echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+    echo ".                                          ."
+    echo ".FAILED! File and/or network not  available."
+    echo ".                                          ."
+    echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
     sleep 10s
 fi
 }
 
-function launch_commandline() {
-break
-}
-
-function system_shutdown() {
-sudo shutdown -P now
-}
-
-function system_reboot() {
-sudo reboot
-}
-
+function launch_commandline() { break; }
+function system_shutdown() { sudo shutdown -P now; }
+function system_reboot() { sudo reboot; }
 
 # Main
-
 main_menu

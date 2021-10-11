@@ -1,0 +1,55 @@
+---
+- name: "Check destination {{ dst_path }}"
+  stat:
+    path: '{{ dst_path }}'
+  register: dst_chck
+
+- name: "Check source {{ src_path }}"
+  stat:
+    path: '{{ src_path }}'
+  register: src_chck
+
+- name: "ANY:Move SRC to DST"
+  command: 'mv -v -f "{{ src_path }}" "{{ dst_path }}"'
+  when:
+    - src_chck.stat.exists
+    - not dst_chck.stat.exists
+  register: src_renamed
+
+- name: "DIR:Sync SRC and DST"
+  command: 'rsync -avH --size-only "{{ src_path }}/" "{{ dst_path }}/"'
+  when:
+    - src_chck.stat.exists
+    - src_chck.stat.isdir
+    - dst_chck.stat.exists
+    - dst_chck.stat.isdir
+    - not (src_renamed is succeeded)
+  register: src_syncd
+
+- name: "FILE:Replace DST with SRC"
+  command: 'mv -v -f "{{ src_path }}" "{{ dst_path }}"'
+  when:
+    - src_chck.stat.exists
+    - src_chck.stat.isfile
+    - dst_chck.stat.exists
+    - dst_chck.stat.isfile
+    - not (src_renamed is succeeded)
+  register: src_moved
+
+- name: "Unlink {{ src_path }}"
+  command: 'unlink "{{ src_path }}"'
+  when:
+    - src_chck.stat.exists
+    - src_chck.stat.islink
+  register: src_unlinkd
+
+- name: "Cleanup {{ src_path }}"
+  command: 'rm -rvf "{{ src_path }}"'
+  when:
+    - src_chck.stat.exists
+    - (src_chck.stat.isdir) or (src_chck.stat.isfile)
+    - not (src_renamed is succeeded)
+    - not (src_unlinkd is succeeded)
+    - (src_moved is succeeded) or (src_syncd is succeeded) or (src_moved is succeeded)
+
+

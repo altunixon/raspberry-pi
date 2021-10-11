@@ -386,3 +386,6 @@ dmypy.json
 .pyre/
 # Geckolog
 geckodriver.log
+
+# Links
+hw-gpi-case/home-retropie

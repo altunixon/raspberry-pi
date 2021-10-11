@@ -1,0 +1,7 @@
+*roms/*.bin
+*roms/*.BIN
+*roms/*.cue
+*.zip
+*.rar
+*.7z
+*.iso

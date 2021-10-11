@@ -1,0 +1,411 @@
+2021-09-24 18:43:14 +0900 [[1;34mINFO[0m]: REQBR [#200] - Url: "https://www.jeffgeerling.com/blog/2020/cross-compiling-raspberry-pi-os-linux-kernel-on-macos" True, Try: [1/2]
+<html>
+ <body>
+  <div class="node__content">
+   <div class="clearfix text-formatted field field--name-body field--type-text-with-summary field--label-hidden field__item">
+    <p>
+     After doing a video testing different
+     <a href="https://www.youtube.com/watch?v=ikpgZu6kLKE">
+      external GPUs on a Raspberry Pi
+     </a>
+     last week, I realized two things:
+    </p>
+    <ol>
+     <li>
+      Compiling the Linux kernel on a Raspberry Pi is slow. It took 54 minutes, and I ended up doing it 7 times during the course of testing for that video.
+     </li>
+     <li>
+      If you ever want to figure out a better way to do something, write a blog post or create a video showing the less optimal way of doing it.
+     </li>
+    </ol>
+    <p>
+     To the second point, about every fifth comment was telling me to cross-compile Linux on a faster machine instead of doing it on the Pi itself. For example:
+    </p>
+    <p>
+     <img alt="cross compile raspberry pi kernel youtube comment" class="insert-image" height="131" src="/sites/default/files/images/cross-compile-comment.png" width="762"/>
+    </p>
+    <p>
+     And on the Pi Forums, it seems like nobody worth their salt compiles the kernel on the Pi either, so I figured—since I'm probably going to have to do it again another thousand times in my life—I might as well put together a guide for how to do it on a Mac.
+    </p>
+    <p>
+     And my first attempt was to use Docker for Mac, but that attempt faltered once I realized there's no way to mount a microSD card ('device') into Docker for Mac, unless you hack things through VirtualBox with Docker inside or use Docker Machine. And that's a lotta layers of abstraction.
+    </p>
+    <p>
+     And my second attempt was to see if osxfuse could be made to help (
+     <a href="/blog/2017/mount-raspberry-pi-sd-card-on-mac-read-only-osxfuse-and-ext4fuse">
+      I've used osxfuse to mount Raspberry Pi microSD cards before...
+     </a>
+     ). That didn't pan out, and I didn't want to rely on something that used paid ext4 software that may or may not work with virtualization, so ultimately I went back to my old faithful, Vagrant + VirtualBox.
+    </p>
+    <p>
+     I wanted to compile the Raspberry Pi OS kernel with support for 9000 MTU on the built-in Gigabit network interface for some ethernet benchmarking I was doing (it only supports 1500 MTU out of the box, and the driver doesn't allow changing MTU on the fly), and I had to put that kernel on four Pi 4 model Bs, so this was the perfect time to start cross-compiling on my fast Core i9 Mac.
+    </p>
+    <h2>
+     Setting up a Debian VM
+    </h2>
+    <p>
+     I wanted my cross-compile environment to be close to the Pi OS, and work with the
+     <a href="https://www.raspberrypi.org/documentation/linux/kernel/building.md">
+      Raspberry Pi Kernel Building
+     </a>
+     directions out of the box, so I created a
+     <a href="https://github.com/geerlingguy/raspberry-pi-pcie-devices/blob/master/extras/cross-compile/Vagrantfile">
+      Vagrantfile
+     </a>
+     that used the
+     <code>
+      debian/buster64
+     </code>
+     base box.
+    </p>
+    <p>
+     See the entire Vagrantfile using the link in the previous paragraph, but one of the more important bits is the enabling of the XHCI USB 3.0 interface in the VM, so you can attach USB devices—and thus access and mount the fat32 and ext4 partitions on a microSD card directly within the VM:
+    </p>
+    <pre><code>    vb.customize ["modifyvm", :id, "--usb", "on"]
+    vb.customize ["modifyvm", :id, "--usbxhci", "on"]
+</code></pre>
+    <p>
+     I initially tried using the USB 2.0 EHCI option instead of USB 3.0 and xHCI, but when I did that, and tried attaching my card reader (detailed later in this post), I got the error message
+     <code>
+      VERR_PDM_NO_USB_PORTS
+     </code>
+     :
+    </p>
+    <p>
+     <img alt="VirtualBox error message VERR_PDM_NO_USB_PORTS" class="insert-image" height="384" src="/sites/default/files/images/VirtualBox-VERR_PDM_NO_USB_PORTS.png" width="674"/>
+    </p>
+    <p>
+     So if you get that error, try out the USB 3.0 XHCI option instead.
+    </p>
+    <p>
+     I also put in an inline
+     <code>
+      shell
+     </code>
+     provisioner in the Vagrantfile that installs all the build dependencies:
+    </p>
+    <pre><code>  config.vm.provision "shell", inline: &lt;&lt;-SHELL
+    apt-get update
+    apt-get install -y git bc bison flex libssl-dev make libc6-dev libncurses5-dev crossbuild-essential-armhf crossbuild-essential-arm64
+  SHELL
+</code></pre>
+    <p>
+     Again, check out the
+     <a href="https://github.com/geerlingguy/raspberry-pi-pcie-devices/blob/master/extras/cross-compile/Vagrantfile">
+      linked Vagrantfile in my GitHub repo
+     </a>
+     to find the whole thing.
+    </p>
+    <p>
+     With that Vagrantfile, assuming you have
+     <a href="https://www.vagrantup.com">
+      Vagrant
+     </a>
+     and
+     <a href="https://www.virtualbox.org/wiki/Downloads">
+      VirtualBox
+     </a>
+     installed on your computer, along with the VirtualBox Extension Pack (required for USB support), you can run
+     <code>
+      vagrant up
+     </code>
+     , and you'll end up with a VM ready to cross-compile ARM Linux!
+    </p>
+    <h2>
+     Getting USB working
+    </h2>
+    <p>
+     The next step for me was to get my external USB card reader (in my case, built into my
+     <a href="https://www.amazon.com/CalDigit-TS3-Plus-Thunderbolt-Dock/dp/B07CZPV8DF/ref=as_li_ss_tl?dchild=1&amp;keywords=caldigit&amp;qid=1604507207&amp;sr=8-5&amp;linkCode=ll1&amp;tag=mmjjg-20&amp;linkId=efbf6a3b55b293650f2367d18a743043&amp;language=en_US">
+      CalDigit TS3 Plus
+     </a>
+     ThunderBolt hub) attached to the VM so when I put in a microSD card, it would show up inside Debian.
+    </p>
+    <p>
+     To do this, I shut down the VM with
+     <code>
+      vagrant halt
+     </code>
+     , then I opened VirtualBox, went into the Settings for the new 'cross-compile' VM, then to 'Ports', then 'USB', then in the 'USB Device Filters' section, I added my 'CalDigit Card Reader [1038]'.
+    </p>
+    <p>
+     <img alt="VirtualBox USB 3 CalDigit Card Reader added to USB ports on VM" class="insert-image" height="503" src="/sites/default/files/images/VirtualBox%20USB%203%20CalDigit%20Card%20Reader.png" width="651"/>
+    </p>
+    <blockquote>
+     <p>
+      You can specify USB device directly in the Vagrantfile (see the comments on
+      <a href="/blogs/jeff-geerling/mounting-raspberry-pis-ext4-sd">
+       this older blog post
+      </a>
+      ), but since I move my Mac between different locations, with different card readers, I didn't want to hardcode anything in the Vagrantfile.
+     </p>
+    </blockquote>
+    <p>
+     Now that the card reader is attached, I started up the VM again, with
+     <code>
+      vagrant up
+     </code>
+     .
+    </p>
+    <h2>
+     Logging in and compiling the Linux kernel
+    </h2>
+    <blockquote>
+     <p>
+      For the rest of this blog post, I'm assuming you'll be building Linux for the Raspberry Pi 4 (or Compute Module 4, or Pi 400), and for 64-bit ARM, not 32-bit. If you need to build for 32-bit, or for a different Pi model, please make sure you use the right environment variables and build args as outlined in the
+      <a href="https://www.raspberrypi.org/documentation/linux/kernel/building.md">
+       Kernel building
+      </a>
+      cross-compiling documentation.
+     </p>
+    </blockquote>
+    <p>
+     Log into the VM using
+     <code>
+      vagrant ssh
+     </code>
+     , then start the process of compiling Linux and copying everything to your microSD card or USB drive:
+    </p>
+    <ol>
+     <li>
+      <p>
+       Clone the linux repo (or clone a fork or a different branch):
+      </p>
+      <p>
+       <code>
+        git clone --depth=1 https://github.com/raspberrypi/linux
+       </code>
+      </p>
+     </li>
+     <li>
+      <p>
+       Run the following commands to make the .config file:
+      </p>
+      <pre><code> cd linux
+ KERNEL=kernel8
+ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- bcm2711_defconfig
+</code></pre>
+     </li>
+     <li>
+      <p>
+       (Optionally) Either edit the .config file by hand or use menuconfig:
+      </p>
+      <p>
+       <code>
+        make menuconfig
+       </code>
+      </p>
+     </li>
+     <li>
+      <p>
+       Compile the Kernel:
+      </p>
+      <p>
+       <code>
+        make -j4 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image modules dtbs
+       </code>
+      </p>
+     </li>
+    </ol>
+    <blockquote>
+     <p>
+      For 32-bit Pi OS, use
+      <code>
+       KERNEL=kernel7l
+      </code>
+      ,
+      <code>
+       ARCH=arm
+      </code>
+      ,
+      <code>
+       CROSS_COMPILE=arm-linux-gnueabihf-
+      </code>
+      , and
+      <code>
+       zImage
+      </code>
+      instead of
+      <code>
+       Image
+      </code>
+      .
+     </p>
+    </blockquote>
+    <h2>
+     Mounting the Pi microSD or USB drive
+    </h2>
+    <p>
+     Mount the FAT and ext4 partitions of the USB card to the system. First, insert your microSD card into the reader you attached to the VM earlier, then run the following commands:
+    </p>
+    <pre><code>mkdir -p mnt/fat32
+mkdir -p mnt/ext4
+sudo mount /dev/sdb1 mnt/fat32
+sudo mount /dev/sdb2 mnt/ext4
+</code></pre>
+    <h2>
+     Installing modules and copying the built Kernel
+    </h2>
+    <p>
+     Install the kernel modules onto the drive:
+    </p>
+    <pre><code>sudo env PATH=$PATH make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=mnt/ext4 modules_install
+</code></pre>
+    <blockquote>
+     <p>
+      For 32-bit Pi OS, use
+      <code>
+       sudo env PATH=$PATH make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- INSTALL_MOD_PATH=mnt/ext4 modules_install
+      </code>
+     </p>
+    </blockquote>
+    <p>
+     Copy the kernel and DTBs onto the drive:
+    </p>
+    <pre><code>sudo cp mnt/fat32/$KERNEL.img mnt/fat32/$KERNEL-backup.img
+sudo cp arch/arm64/boot/Image mnt/fat32/$KERNEL.img
+sudo cp arch/arm64/boot/dts/broadcom/*.dtb mnt/fat32/
+sudo cp arch/arm64/boot/dts/overlays/*.dtb* mnt/fat32/overlays/
+sudo cp arch/arm64/boot/dts/overlays/README mnt/fat32/overlays/
+</code></pre>
+    <h2>
+     Unmounting the drive
+    </h2>
+    <p>
+     Unmount the disk before you remove it from the card reader or unplug it.
+    </p>
+    <pre><code>sudo umount mnt/fat32
+sudo umount mnt/ext4
+</code></pre>
+    <p>
+     Now you can pull the card out of the reader, or disconnect your USB drive, and put it in the Pi!
+    </p>
+    <h2>
+     Conclusion
+    </h2>
+    <p>
+     <img alt="cross compile takes 17 minutes on macbook pro in VM" class="insert-image" height="239" src="/sites/default/files/images/cross-compile-17m-vagrant-virtualbox.png" width="427"/>
+    </p>
+    <p>
+     In total, compiling the kernel on my MacBook Pro only takes about 18-20 minutes (whereas it took over an hour on the Pi 4 model B). I can probably optimize the VM layout and CPU utilization better to bring that number down a bit more, and probably will at some point.
+    </p>
+    <p>
+     Since I'm making a lot of tweaks right now to multiple Pis at a time (and currently testing a new GPU, a 10 Gbps network adapter, and a 4x 1 Gbps network adapter on the Compute Module 4), this is a much more efficient way to build custom Pi kernels.
+    </p>
+    <p>
+     Please check out the
+     <a href="https://pipci.jeffgeerling.com">
+      Raspberry Pi PCI Express Card Database
+     </a>
+     project for the latest configuration and documentation for everything mentioned in this blog post, in the
+     <a href="https://github.com/geerlingguy/raspberry-pi-pcie-devices/tree/master/extras/cross-compile">
+      cross-compile
+     </a>
+     directory.
+    </p>
+   </div>
+   <div class="region region-node-bottom">
+    <div class="views-element-container block block-views block-views-blockrelated-content-block-1" id="block-related-content">
+     <h2>
+      Further reading
+     </h2>
+     <div class="block-content">
+      <div>
+       <div class="view view-related-content view-id-related_content view-display-id-block_1 js-view-dom-id-217558f962b0c9d4f5f5e2c359c094229e5b753a356b64920ad5247585c9a2cb">
+        <div class="view-content">
+         <div class="item-list">
+          <ul>
+           <li>
+            <div class="views-field views-field-title">
+             <span class="field-content">
+              <a href="/blog/2020/wifi-6-gets-134-gbps-on-raspberry-pi-cm4" hreflang="en">
+               WiFi 6 gets 1.34 Gbps on the Raspberry Pi CM4
+              </a>
+             </span>
+            </div>
+           </li>
+           <li>
+            <div class="views-field views-field-title">
+             <span class="field-content">
+              <a href="/blog/2020/building-fastest-raspberry-pi-nas-sata-raid" hreflang="en">
+               Building the fastest Raspberry Pi NAS, with SATA RAID
+              </a>
+             </span>
+            </div>
+           </li>
+           <li>
+            <div class="views-field views-field-title">
+             <span class="field-content">
+              <a href="/blog/2021/hardware-raid-on-raspberry-pi-cm4" hreflang="en">
+               Hardware RAID on the Raspberry Pi CM4
+              </a>
+             </span>
+            </div>
+           </li>
+          </ul>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+   <div class="field field--name-field-tags field--type-entity-reference field--label-hidden field__items">
+    <div class="field__item">
+     <a href="/tags/raspberry-pi" hreflang="en">
+      raspberry pi
+     </a>
+    </div>
+    <div class="field__item">
+     <a href="/tags/arm64" hreflang="en">
+      arm64
+     </a>
+    </div>
+    <div class="field__item">
+     <a href="/tags/compile" hreflang="en">
+      compile
+     </a>
+    </div>
+    <div class="field__item">
+     <a href="/tags/linux" hreflang="en">
+      linux
+     </a>
+    </div>
+    <div class="field__item">
+     <a href="/tags/debian" hreflang="en">
+      debian
+     </a>
+    </div>
+    <div class="field__item">
+     <a href="/tags/virtualbox" hreflang="en">
+      virtualbox
+     </a>
+    </div>
+    <div class="field__item">
+     <a href="/tags/vagrant" hreflang="en">
+      vagrant
+     </a>
+    </div>
+    <div class="field__item">
+     <a href="/tags/macos" hreflang="en">
+      macos
+     </a>
+    </div>
+    <div class="field__item">
+     <a href="/tags/mac" hreflang="en">
+      mac
+     </a>
+    </div>
+   </div>
+   <div class="node__links">
+    <ul class="links inline">
+     <li class="comment-add">
+      <a href="/comment/reply/node/3051/comment_node_blog_post#comment-form" title="Share your thoughts and opinions.">
+       Add new comment
+      </a>
+     </li>
+    </ul>
+   </div>
+  </div>
+ </body>
+</html>
