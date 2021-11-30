@@ -127,7 +127,8 @@
   # 1. Press “n” to create a partition.
   # 2. Press “p” to make it a primary partition.
   # 3. Press “1” to make it the first partition in the table.
-  # 4. Type "8192" to set the start sector. (mimicking original rpi image) or press <enter> to use default start sector which is 2048.
+  # 4. Press <enter> to use default start sector which is 2048
+  #    or type "8192" to set the start sector. (mimicking original rpi image)
   # 5. Type +size to choose the size. In my case I want 512MB, so I’ll type “+512M”.
   # 6. After it’s created, press “a” to make it bootable.
   # 7. Now we press “p” to print and view the partition table, as shown below.
@@ -164,10 +165,69 @@
   ```bash
   # Inspect image layout
   fdisk -l disk.img
+  # take note of partition start points
+  Device                                    Boot  Start     End Sectors  Size Id Type
+  2021-05-07-raspios-buster-armhf-lite.img1        8192  532479  524288  256M  c W95 FAT32 (LBA)
+  2021-05-07-raspios-buster-armhf-lite.img2      532480 3661823 3129344  1.5G 83 Linux
+  # mount loop device with offset
+  sudo mount -o "loop,offset=$((532480 * 512))" disk.img /media/iso
+  sudo mount -o "loop,offset=$((8192 * 512))" disk.img /media/iso/boot
   # Mount multipart disk image with losetup (util-linux >= 2.21 / Ubuntu 16.04)
   sudo losetup -Pf disk.img
+  sudo mount /dev/loop0p2 /media/iso
+  sudo mount /dev/loop0p1 /media/iso/boot
+  losetup -d /dev/loop0
   # or with other utilities
   sudo kpartx -a -v file.iso
   sudo partx -a -v file.iso
   ```
   If you need just a simple boot partition, you don’t need to purchase large Micro SD cards.
+- Sync the image content to your new drive, remember to mount the new drive's home and boot partition accordingly
+  ```bash
+  rsync -a /media/iso/ /media/sdcard/
+  ```
+
+## Changing partition mount settings in /boot
+- Change the root partition id used in boot command and disable partition auto resize on first boot
+  ```bash
+  sudo vim /media/sdcard/boot/cmdline.txt
+  ```
+- change the boot command argument
+  ```bash
+  console=serial0,115200 console=tty1 root=PARTUUID=9730496b-02 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet init=/usr/lib/raspi-config/init_resize.sh
+  ```
+- change the iso's default `PARTUUID=9730496b-02` to your new disk partition UUID/PARTUUID see `sudo blkid`
+  ```bash
+  console=serial0,115200 console=tty1 root=UUID=d4850479-3999-4f4a-bedb-1b6909e7ddf2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet
+  ```
+  Note: PARTUUID may not be available, since it's only available on GPT partition table, not MBR, if not use UUID instead.
+  - Generate boot image `mkinitramfs -o boot/initrd.img`
+  - Add `echo "initramfs initrd.img" >> boot/config.txt` to boot config
+- while you're at it, also delete the `init=/usr/lib/raspi-config/init_resize.sh` argument, since we are using a custom partition layout, resize on first boot is actually destructive.
+- Optional, while you're here, add a `touch /media/sdcard/boot/ssh` file and `/media/sdcard/boot/wpa_supplicant.conf` to the boot partition to enable ssh and wifi respectively
+
+## Change partion reference point in /etc
+- Double check `cat /media/sdcard/etc/rc.local` to see if anything else will be run on boot \(older raspbian versions had the root resize script ran from here\)
+- Edit `sudo vim etc/fstab` to point to your hdd partition
+- Original
+  ```bash
+  proc            /proc           proc    defaults          0       0
+  PARTUUID=9730496b-01  /boot           vfat    defaults          0       2
+  PARTUUID=9730496b-02  /               ext4    defaults,noatime  0       1
+  ```
+- Change to reflect your own partition layout
+  ```bash
+  proc            /proc           proc    defaults          0       0
+  UUID=60A6-0B2B  /boot           vfat    defaults          0       2
+  UUID=d4850479-3999-4f4a-bedb-1b6909e7ddf2  /        ext4    defaults,noatime  0 1
+  UUID=460df863-1387-4f79-b0f1-2a788cf981f8  /home    ext4    defaults,noatime  0 0
+  ```
+
+## Potential bug
+Boot process might not recognize UUID</br>
+Fix:
+- Generate boot image `mkinitramfs -o boot/initrd.img`
+- Add `initramfs initrd.img` to `boot/config.txt`
+- Or just use predictive device name in `boot/cmdline.txt` instead of UUID</br>
+  ie: `root=/dev/sda2` \(first disk is usually sda\)
+
