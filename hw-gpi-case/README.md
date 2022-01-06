@@ -16,11 +16,12 @@ ansible-playbook -i gpi-hosts.yml --user pi --ask-pass playbook-push.yml
 ## Sync save file
 ```bash
 ssh pi@192.168.11.65
-ln -s ~/RetroPie-Data/roms ~/RetroPie/roms
-ln -s ~/RetroPie-Data/BIOS ~/RetroPie/BIOS
-ln -s ~/RetroPie-Data/pcsx-memcards /opt/retropie/emulators/pcsx-rearmed/memcards
-ln -s ~/RetroPie-Data/pcsx-sstates /opt/retropie/configs/psx/pcsx/sstates
-for x in $(ls /home/alt/RetroPie/BIOS/scph*); do ln -s "$x" /opt/retropie/emulators/pcsx-rearmed/bios/; done
+export gpihome='~'
+ln -s ${gpihome}/RetroPie-Data/roms ${gpihome}/RetroPie/roms
+ln -s ${gpihome}/RetroPie-Data/BIOS ${gpihome}/RetroPie/BIOS
+ln -s ${gpihome}/RetroPie-Data/pcsx-memcards /opt/retropie/emulators/pcsx-rearmed/memcards
+ln -s ${gpihome}/RetroPie-Data/pcsx-sstates /opt/retropie/configs/psx/pcsx/sstates
+for x in $(ls ${gpihome}/RetroPie/BIOS/scph*); do ln -s "$x" /opt/retropie/emulators/pcsx-rearmed/bios/; done
 exit
 cat << EOT >> ~/RetroPie-Data/retropie-exclude.txt
 *roms/*.bin

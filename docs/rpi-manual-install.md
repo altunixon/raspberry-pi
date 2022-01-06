@@ -226,7 +226,9 @@
 ## Potential bug
 Boot process might not recognize UUID</br>
 Fix:
-- Generate boot image `mkinitramfs -o boot/initrd.img`
+- Switch root `sudo chroot /media/sdcard/`
+- List available kernels `ls -l lib/modules`
+- Generate boot image `mkinitramfs -o boot/initrd.img 5.10.17+`
 - Add `initramfs initrd.img` to `boot/config.txt`
 - Or just use predictive device name in `boot/cmdline.txt` instead of UUID</br>
   ie: `root=/dev/sda2` \(first disk is usually sda\)

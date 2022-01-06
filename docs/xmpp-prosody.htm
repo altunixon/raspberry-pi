@@ -1,0 +1,341 @@
+<html>
+ <body>
+  <article id="post">
+   <h1>
+    Install Prosody XMPP Server on your Raspberry Pi
+   </h1>
+   <p class="page-title-sub">
+    <span id="post-title-date">
+     Created at 2016-09-09
+    </span>
+    <span id="post-title-updated">
+     Updated at 2016-11-02
+    </span>
+    <span id="post-title-tags">
+     Tag
+     <a href="/tags/linux/">
+      Linux
+     </a>
+     /
+     <a href="/tags/xmpp/">
+      XMPP
+     </a>
+     /
+     <a href="/tags/prosody/">
+      Prosody
+     </a>
+     /
+     <a href="/tags/raspberry-pi/">
+      Raspberry Pi
+     </a>
+     /
+     <a href="/tags/conversations/">
+      Conversations
+     </a>
+     /
+     <a href="/tags/jabber/">
+      Jabber
+     </a>
+    </span>
+   </p>
+   <h1 id="Overview">
+    <a class="headerlink" href="#Overview" title="Overview">
+    </a>
+    Overview
+   </h1>
+   <p>
+    Extensible Messaging and Presence Protocol (XMPP) is a set of free and open technologies for instant messaging, multi-party chat, voice and video chat, and more. It is a federated system, meaning that a user from one XMPP server can messaging someone with a different account on another server. This guide will show you how to setup your own XMPP chat service on Ubuntu or Debian using the
+    <a href="https://prosody.im/">
+     Prosody
+    </a>
+    XMPP server.
+   </p>
+   <p>
+    Use
+    <a href="./../dyndns/index.html">
+     this guide
+    </a>
+    to configure dynamic DNS on your raspberry pi if you would like to connect to a named domain. This is most likely essential if you are hosting your pi from your home.
+   </p>
+   <h1 id="Install">
+    <a class="headerlink" href="#Install" title="Install">
+    </a>
+    Install
+   </h1>
+   <p>
+    Prosody should already be in your distribution’s the repositories.
+    <br/>
+    <figure class="highlight bash">
+     <table>
+      <tr>
+       <td class="gutter">
+        <pre><div class="line">1</div></pre>
+       </td>
+       <td class="code">
+        <pre><div class="line">sudo apt-get install prosody</div></pre>
+       </td>
+      </tr>
+     </table>
+    </figure>
+   </p>
+   <p>
+    Generate you self-signed certs and keys:
+   </p>
+   <figure class="highlight bash">
+    <table>
+     <tr>
+      <td class="gutter">
+       <pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre>
+      </td>
+      <td class="code">
+       <pre><div class="line">sudo su</div><div class="line"><span class="built_in">cd</span> /etc/prosody/certs/</div><div class="line">sudo openssl genrsa -out prosody.key 4096</div><div class="line">sudo openssl req -new -sha256 -key prosody.key -out prosody.csr</div><div class="line">sudo openssl x509 -req -sha256 -days 3650 -in prosody.csr -signkey prosody.key -out prosody.crt</div><div class="line"><span class="built_in">exit</span></div></pre>
+      </td>
+     </tr>
+    </table>
+   </figure>
+   <p>
+    Next we plug in our SSH stuff to encrypt communicatinos on our server. We change this:
+    <br/>
+    <figure class="highlight bash">
+     <table>
+      <tr>
+       <td class="gutter">
+        <pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre>
+       </td>
+       <td class="code">
+        <pre><div class="line">VirtualHost <span class="string">"example.com"</span></div><div class="line">        enabled = <span class="literal">false</span> -- Remove this line to <span class="built_in">enable</span> this host</div><div class="line"> </div><div class="line">        -- Assign this host a certificate <span class="keyword">for</span> TLS, otherwise it would use the one</div><div class="line">        -- <span class="built_in">set</span> <span class="keyword">in</span> the global section (<span class="keyword">if</span> any).</div><div class="line">        -- Note that old-style SSL on port 5223 only supports one certificate, and will always</div><div class="line">        -- use the global one.</div><div class="line">        ssl = {</div><div class="line">                key = <span class="string">"/etc/prosody/certs/example.com.key"</span>;</div><div class="line">                certificate = <span class="string">"/etc/prosody/certs/example.com.crt"</span>;</div><div class="line">        }</div></pre>
+       </td>
+      </tr>
+     </table>
+    </figure>
+   </p>
+   <p>
+    Into this:
+    <br/>
+    <figure class="highlight bash">
+     <table>
+      <tr>
+       <td class="gutter">
+        <pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre>
+       </td>
+       <td class="code">
+        <pre><div class="line">VirtualHost <span class="string">"myIncredibleSiteName.no-ip.org"</span></div><div class="line">        ssl = {</div><div class="line">                key = <span class="string">"/etc/prosody/certs/prosody.key"</span>;</div><div class="line">                certificate = <span class="string">"/etc/prosody/certs/prosody.crt"</span>;</div><div class="line">        }</div></pre>
+       </td>
+      </tr>
+     </table>
+    </figure>
+   </p>
+   <p>
+    Enable multi-user chat, if desired:
+    <br/>
+    <figure class="highlight plain">
+     <table>
+      <tr>
+       <td class="gutter">
+        <pre><div class="line">1</div></pre>
+       </td>
+       <td class="code">
+        <pre><div class="line">Component "conference.example.no-ip.net" "muc"</div></pre>
+       </td>
+      </tr>
+     </table>
+    </figure>
+   </p>
+   <p>
+    Restart to make settings take effect:
+   </p>
+   <figure class="highlight bash">
+    <table>
+     <tr>
+      <td class="gutter">
+       <pre><div class="line">1</div></pre>
+      </td>
+      <td class="code">
+       <pre><div class="line">sudo /etc/init.d/prosody restart</div></pre>
+      </td>
+     </tr>
+    </table>
+   </figure>
+   <p>
+    Next, we configure our first user.
+   </p>
+   <figure class="highlight bash">
+    <table>
+     <tr>
+      <td class="gutter">
+       <pre><div class="line">1</div></pre>
+      </td>
+      <td class="code">
+       <pre><div class="line">prosodyctl adduser admin@example.ddns.net</div></pre>
+      </td>
+     </tr>
+    </table>
+   </figure>
+   <p>
+    Give the desired password at prompt.
+   </p>
+   <p>
+    Now foreward ports
+    <code>
+     5222
+    </code>
+    and
+    <code>
+     5269
+    </code>
+    on your router (Go ahead and foreward
+    <code>
+     5280
+    </code>
+    and
+    <code>
+     5281
+    </code>
+    as well if you want to upload and store files on your server).
+   </p>
+   <p>
+    To view information about your Prosody install, enter:
+   </p>
+   <figure class="highlight bash">
+    <table>
+     <tr>
+      <td class="gutter">
+       <pre><div class="line">1</div></pre>
+      </td>
+      <td class="code">
+       <pre><div class="line">prosodyctl about</div></pre>
+      </td>
+     </tr>
+    </table>
+   </figure>
+   <h1 id="Conversations">
+    <a class="headerlink" href="#Conversations" title="Conversations">
+    </a>
+    Conversations
+   </h1>
+   <p>
+    An excellent free and open source XMPP client for Android is
+    <a href="https://conversations.im/">
+     Conversations
+    </a>
+    (also available at no cost on
+    <a href="https://f-droid.org/repository/browse/?fdfilter=conversations&amp;fdid=eu.siacs.conversations">
+     F-Droid
+    </a>
+   </p>
+   <p>
+    After installing the app, insert your user credentials.
+   </p>
+   <p>
+    Depending an the XMPP server that you create an account on, different functionality will be available to you.
+    <a href="">
+     Here is a list of different servers and the XMPP extensions that they support
+    </a>
+   </p>
+   <hr/>
+   <p>
+    Right now we can add contacts and message with them. We can send any type of file, and it is routed and stored on the destination’s phone.
+   </p>
+   <p>
+    But what about group messaging? What about syncing message on different devices?
+   </p>
+   <hr/>
+   <p>
+    Go to Manage Accounts, select yours.
+   </p>
+   <p>
+    In upper right, check the Server info box.
+   </p>
+   <p>
+    We have a lot of cool stuff missing, it’s time we tried enabling it!
+   </p>
+   <h1 id="Modules">
+    <a class="headerlink" href="#Modules" title="Modules">
+    </a>
+    Modules
+   </h1>
+   <p>
+    <a href="https://gultsch.de/compliance.html">
+     Here
+    </a>
+    is a great list of public XMPP servers and the extensions that they support.
+   </p>
+   <p>
+    On our server, let’s enable all of the modules that the Conversations app supports.
+   </p>
+   <p>
+    First, install mercurial:
+   </p>
+   <figure class="highlight bash">
+    <table>
+     <tr>
+      <td class="gutter">
+       <pre><div class="line">1</div></pre>
+      </td>
+      <td class="code">
+       <pre><div class="line">sudo apt-get install mercurial</div></pre>
+      </td>
+     </tr>
+    </table>
+   </figure>
+   <p>
+    Go into
+    <code>
+     /usr/lib/prosody
+    </code>
+    <br/>
+    <figure class="highlight bash">
+     <table>
+      <tr>
+       <td class="gutter">
+        <pre><div class="line">1</div></pre>
+       </td>
+       <td class="code">
+        <pre><div class="line">hg <span class="built_in">clone</span> https://hg.prosody.im/prosody-modules/ prosody-modules</div></pre>
+       </td>
+      </tr>
+     </table>
+    </figure>
+   </p>
+   <p>
+    In
+    <code>
+     /etc/prosody/prosody.lua.config
+    </code>
+    , add below the admin line
+    <code>
+     plugin_paths = { "/usr/lib/prosody/prosody-modules" }
+    </code>
+   </p>
+   <p>
+    This is what my modules_enabled portion looks like now:
+   </p>
+   <figure class="highlight bash">
+    <table>
+     <tr>
+      <td class="gutter">
+       <pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div></pre>
+      </td>
+      <td class="code">
+       <pre><div class="line">modules_enabled = {</div><div class="line"></div><div class="line">  -- Generally required</div><div class="line">    <span class="string">"roster"</span>; -- Allow users to have a roster. Recommended ;)</div><div class="line">    <span class="string">"saslauth"</span>; -- Authentication <span class="keyword">for</span> clients and servers. Recommended <span class="keyword">if</span> you want to <span class="built_in">log</span> in.</div><div class="line">    <span class="string">"tls"</span>; -- Add support <span class="keyword">for</span> secure TLS on c2s/s2s connections</div><div class="line">    <span class="string">"dialback"</span>; -- s2s dialback support</div><div class="line">    <span class="string">"disco"</span>; -- Service discovery</div><div class="line"></div><div class="line">  -- Not essential, but recommended</div><div class="line">    <span class="string">"private"</span>; -- Private XML storage (<span class="keyword">for</span> room bookmarks, etc.)</div><div class="line">    <span class="string">"vcard"</span>; -- Allow users to <span class="built_in">set</span> vCards</div><div class="line">  </div><div class="line">  -- These are commented by default as they have a performance impact</div><div class="line">    --<span class="string">"privacy"</span>; -- Support privacy lists</div><div class="line">    --<span class="string">"compression"</span>; -- Stream compression (Debian: requires lua-zlib module to work)</div><div class="line"></div><div class="line">  -- Nice to have</div><div class="line">    <span class="string">"version"</span>; -- Replies to server version requests</div><div class="line">    <span class="string">"uptime"</span>; -- Report how long server has been running</div><div class="line">    <span class="string">"time"</span>; -- Let others know the time here on this server</div><div class="line">    <span class="string">"ping"</span>; -- Replies to XMPP pings with pongs</div><div class="line">    <span class="string">"pep"</span>; -- Enables users to publish their mood, activity, playing music and more</div><div class="line">    <span class="string">"register"</span>; -- Allow users to register on this server using a client and change passwords</div><div class="line"></div><div class="line">  -- Admin interfaces</div><div class="line">    <span class="string">"admin_adhoc"</span>; -- Allows administration via an XMPP client that supports ad-hoc commands</div><div class="line">    --<span class="string">"admin_telnet"</span>; -- Opens telnet console interface on localhost port 5582</div><div class="line">  </div><div class="line">  -- HTTP modules</div><div class="line">    <span class="string">"bosh"</span>; -- Enable BOSH clients, aka <span class="string">"Jabber over HTTP"</span></div><div class="line">    <span class="string">"http_files"</span>; -- Serve static files from a directory over HTTP</div><div class="line"></div><div class="line">  -- Other specific functionality</div><div class="line">    <span class="string">"posix"</span>; -- POSIX functionality, sends server to background, enables syslog, etc.</div><div class="line">    --<span class="string">"groups"</span>; -- Shared roster support</div><div class="line">    --<span class="string">"announce"</span>; -- Send announcement to all online users</div><div class="line">    --<span class="string">"welcome"</span>; -- Welcome users who register accounts</div><div class="line">    --<span class="string">"watchregistrations"</span>; -- Alert admins of registrations</div><div class="line">    --<span class="string">"motd"</span>; -- Send a message to users when they <span class="built_in">log</span> <span class="keyword">in</span></div><div class="line">    --<span class="string">"legacyauth"</span>; -- Legacy authentication. Only used by some old clients and bots.</div><div class="line">    --</div><div class="line">    --external modules--</div><div class="line">    <span class="string">"carbons"</span>;</div><div class="line">    <span class="string">"mam"</span>;</div><div class="line">    <span class="string">"mam_archive"</span>;</div><div class="line">    <span class="string">"smacks"</span>;</div><div class="line">    <span class="string">"http"</span>;</div><div class="line">    <span class="string">"http_upload"</span>;</div><div class="line">    <span class="string">"http_muc_log"</span>;</div><div class="line">    <span class="string">"csi"</span>;</div><div class="line">    <span class="string">"privacy"</span>;</div><div class="line">    <span class="string">"blocking"</span>;</div><div class="line">};</div><div class="line"></div><div class="line">--HTTP STUFF-----</div><div class="line">http_ports = { 5280 }</div><div class="line">http_interfaces = { <span class="string">"*"</span> }</div><div class="line"> </div><div class="line">https_ports = { 5281 }</div><div class="line">https_interfaces = { <span class="string">"*"</span> }</div><div class="line">http_upload_file_size_<span class="built_in">limit</span> = 1024 * 1024 * 20 --20MB</div><div class="line"></div><div class="line"> https_ssl = {</div><div class="line">    certificate = <span class="string">"/etc/prosody/certs/prosody.crt"</span>;</div><div class="line">    key = <span class="string">"/etc/prosody/certs/prosody.key"</span>;</div><div class="line">    }</div><div class="line">--END HTTP STUFF------</div></pre>
+      </td>
+     </tr>
+    </table>
+   </figure>
+   <p>
+    Restart Prosody to enable changes:
+   </p>
+   <p>
+    <code>
+     sudo /etc/init.d/prosody restart
+    </code>
+   </p>
+   <p>
+    All my modules are enabled!
+   </p>
+   <p>
+    <img alt="allModulesWorking" src="./../prosodyonpi/workingConversations.png"/>
+   </p>
+  </article>
+ </body>
+</html>
