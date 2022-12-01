@@ -1,0 +1,327 @@
+<html>
+ <body>
+  <div class="content">
+   <strong>
+    Pi OS 11 (Debian Bullseye) Bonding Ethernet And WiFI Interfaces
+   </strong>
+   <br/>
+   This post is to update several threads in this forum, since multiple attempts have been made to bond ethernet and wifi interfaces, some successful some less so.  The issues around bonding configuration often appear from various sources, change in component software, OS versions, etc., tripping up bonding that once worked and don't.  Such was the base for me, moving from Pi OS 10 to 11.  The following works both for straight Debian 11 as well as Pi OS 11 in fact.
+   <br/>
+   <br/>
+   Also, there are a few bugs that are bouncing around that impact bonding attempts, a key one is the ifenslave 2.12 bug, where apparently fixed in 2.13, but at the time of this post is not core to Debian 11 or Pi OS 11 releases, still in testing apparently.  I found the entire process of walking through all the old, bad, etc. examples on the web frustrating, if educational.
+   <br/>
+   <br/>
+   This implementation, retains use of dhcpcd, so DHCP or static network address configuration.  This implementation also uses the newer interfaces.d directory architecture.  One warning... do not restart networking service, do actual reboots, since this seems to be the only way to ensure the bonded interface gets a unique MAC address, and reboot ensures that predictive network names is engaged.
+   <br/>
+   <br/>
+   The following files are changed or established, /etc/dhcpcd.conf, /etc/network/interface.d/bond, /etc/modules.  It is suggested, with emphasis, that all all files are copied/saved before any changes made.
+   <br/>
+   <br/>
+   <strong>
+    Here We Go!
+   </strong>
+   <div class="codebox">
+    <p>
+     Code:
+     <a href="#" onclick="selectCode(this); return false;">
+      Select all
+     </a>
+    </p>
+    <pre><code># cp /etc/modules /etc/modules.origin
+# cp /etc/dhcpcd.conf /etc/dhcpcd.conf.origin
+# touch /etc/network/interfaces.d/bond0
+</code></pre>
+   </div>
+   <strong>
+    Add Required Components...
+   </strong>
+   <br/>
+   Note, ifupdown2 (
+   <a class="postlink" href="https://packages.debian.org/unstable/ifupdown2">
+    https://packages.debian.org/unstable/ifupdown2
+   </a>
+   ) is not core to Debian 11 or Pi OS 11, default installation, which seems odd to me.  Moreover, by using ifupdown2, see to avoid some of the issues with the 2.12 ifenslave package.  Use of apt-file is not required, just easy to have if needed to find specific component package contents.
+   <div class="codebox">
+    <p>
+     Code:
+     <a href="#" onclick="selectCode(this); return false;">
+      Select all
+     </a>
+    </p>
+    <pre><code># apt update
+# apt list --upgradable
+# apt full-upgrade
+# apt install file-update
+# apt-file update
+# apt-file search ifupdown2
+# apt install ifupdown2 wireless-tools net-tools dnsutils
+# apt autoremove
+</code></pre>
+   </div>
+   <strong>
+    Enable Predictable Network Interface Names...
+   </strong>
+   <div class="codebox">
+    <p>
+     Code:
+     <a href="#" onclick="selectCode(this); return false;">
+      Select all
+     </a>
+    </p>
+    <pre><code># raspi-config
+</code></pre>
+   </div>
+   6 Advanced Options
+   <br/>
+   A4 Network Interface Names
+   <br/>
+   Yes
+   <br/>
+   Or use Raspi-Config CLI
+   <a class="postlink" href="https://github.com/raspberrypi-ui/rc_gui/blob/master/src/rc_gui.c#L23-L70">
+    https://github.com/raspberrypi-ui/rc_gu ... .c#L23-L70
+   </a>
+   <div class="codebox">
+    <p>
+     Code:
+     <a href="#" onclick="selectCode(this); return false;">
+      Select all
+     </a>
+    </p>
+    <pre><code># raspi-config do_net_names 0
+</code></pre>
+   </div>
+   <strong>
+    Capture Network Interface Names...
+   </strong>
+   <br/>
+   Make note of these, will be used on the various configuration files below, commands below, etc.
+   <div class="codebox">
+    <p>
+     Code:
+     <a href="#" onclick="selectCode(this); return false;">
+      Select all
+     </a>
+    </p>
+    <pre><code># ip -br addr show
+lo		UNKNOWN	127.0.0.1/8
+eth0	UP			192.168.1.212/24
+wlan0	UP			192.168.1.213/24
+</code></pre>
+   </div>
+   <strong>
+    Enable Bonding...
+   </strong>
+   <br/>
+   Expectation is that initial lsmod does not show driver module loaded, cat should show bonding listed at end of file.
+   <div class="codebox">
+    <p>
+     Code:
+     <a href="#" onclick="selectCode(this); return false;">
+      Select all
+     </a>
+    </p>
+    <pre><code># lsmod | grep bonding
+
+# modprobe bonding
+# lsmod | grep bonding
+bonding               139264  0
+
+# echo 'bonding' &gt;&gt; /etc/modules
+# cat /etc/modules | grep bonding
+bonding
+</code></pre>
+   </div>
+   <strong>
+    Establish dhcpcd Service Configuration file.
+   </strong>
+   <br/>
+   This is a bit complex by design, in that, each interface is defined, ethernet, wifi, and bond.  Each interface has a static address fail back configuration. However, ethernet and wifi interfaces are disabled explicitly, see first line of file below.  The bond0 configuration should have the only active ip address when active.
+   <br/>
+   <br/>
+   Why do I have eth0 and wlan0 defined at all?  The logic of this is that I can with one change of this configuration file, re-enable the ethernet and wifi separate configurations as needed.  The bond configuration assumes the ip address of eth0, via dhcp or static, so that any name resolution, i.e. DNS configuration is consistent regardless of configuration state.
+   <div class="codebox">
+    <p>
+     Code:
+     <a href="#" onclick="selectCode(this); return false;">
+      Select all
+     </a>
+    </p>
+    <pre><code># nano /etc/dhcpcd.conf
+	# Customize Per Interfaces...
+	# Disable eth0 and wlan0 When Bond0 Desired, comment the following line, to allow dhcp with static fall back for eth0 and wlan0...
+	denyinterfaces eth0 wlan0
+
+	# Configuration...
+	hostname
+	clientid
+	persistent
+	option rapid_commit
+	option domain_name_servers, domain_name, domain_search, host_name
+	option classless_static_routes
+	option interface_mtu
+	require dhcp_server_identifier
+	slaac private
+
+	# Static Bond0...
+	profile STATIC_BOND0
+	static ip_address=192.168.1.212/24
+	#static ip6_address=/64
+	static routers=192.168.1.1
+	static domain_name_servers=192.168.1.24
+
+	# Dynamic Bond0...
+	interface bond0
+	fallback STATIC_BOND0
+
+	# Static eth0...
+	profile STATIC_ETH0
+	static ip_address=192.168.1.212/24
+	#static ip6_address=/64
+	static routers=192.168.1.1
+	static domain_name_servers=192.168.1.24
+
+	# Dynamic eth0...
+	interface eth0
+	fallback STATIC_ETH0
+
+	# Static wlan0...
+	profile STATIC_WLAN0
+	static ip_address=192.168.1.213/24
+	static routers=192.168.1.1
+	static domain_name_servers=192.168.1.24
+
+	# Dynamic wlan0...
+	interface wlan0
+	fallback STATIC_WLAN0
+</code></pre>
+   </div>
+   <strong>
+    Establish Bond Configuration...
+   </strong>
+   <br/>
+   Note this is in /etc/network/interfaces.d/ directory:  Also, for some reason, the wifi interface association was inconsistent when I was testing this solution, so I explicitly invoke the wifi configuration.  This maybe a timing issue or service start order sequence issue, given that networking and wpa_supplicant services interact.  Or may even be because some of my Pi devices have external wifi USB adapters so there is a timing or dependency issue there, maybe with UDEV or such as well.
+   <br/>
+   <div class="codebox">
+    <p>
+     Code:
+     <a href="#" onclick="selectCode(this); return false;">
+      Select all
+     </a>
+    </p>
+    <pre><code># cat /etc/network/interfaces.d/bond0
+	# Bond Configuration
+	auto bond0
+	# Static Or DHCP Via DHCPCD Service Configuration...
+	iface bond0 inet dhcp
+        # Ensure Bond And WiFi Interface Assignment...
+	    pre-up wpa_supplicant -B -b bond0 -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf
+
+        # Ensure Interface Assignments...
+        bond-primary eth0
+		bond-slaves eth0 wlan0
+		bond-mode active-backup
+		bond-miimon 100
+		bond-downdelay 0
+		bond-updelay 800
+		bond-primary_reselect always
+</code></pre>
+   </div>
+   <strong>
+    Reboot...
+   </strong>
+   <div class="codebox">
+    <p>
+     Code:
+     <a href="#" onclick="selectCode(this); return false;">
+      Select all
+     </a>
+    </p>
+    <pre><code># reboot
+</code></pre>
+   </div>
+   <strong>
+    Validate Configuration...
+   </strong>
+   <br/>
+   Explicitly, confirm wifi association.  The key is that the ESSID shows the name of the wifi network expected, and the Access Point shows the MAC address for the given ESSID.   The bonding state will show the wifi adapter as up, i.e. online, but without association active, the bonding is not operational, when or if eth0 fails, disconnects, etc.:
+   <div class="codebox">
+    <p>
+     Code:
+     <a href="#" onclick="selectCode(this); return false;">
+      Select all
+     </a>
+    </p>
+    <pre><code># iwconfig wlan0
+wlan0     IEEE 802.11  ESSID:"XXXXX"
+          Mode:Managed  Frequency:2.452 GHz  Access Point: 11:11:11:11:11:11
+          Bit Rate=24 Mb/s   Tx-Power=31 dBm
+          Retry short limit:7   RTS thr:off   Fragment thr:off
+          Encryption key:off
+          Power Management:on
+          Link Quality=70/70  Signal level=-10 dBm
+          Rx invalid nwid:0  Rx invalid crypt:0  Rx invalid frag:0
+          Tx excessive retries:0  Invalid misc:0   Missed beacon:0
+
+# ip -br addr show
+lo		UNKNOWN	127.0.0.1/8
+eth0	UP
+wlan0	UP
+bond0	UP			192.168.1.212/24
+
+# cat /proc/net/bonding/bond0
+Ethernet Channel Bonding Driver: v5.10.63-v7+
+
+Bonding Mode: fault-tolerance (active-backup)
+Primary Slave: eth0 (primary_reselect always)
+Currently Active Slave: eth0
+MII Status: up
+MII Polling Interval (ms): 100
+Up Delay (ms): 800
+Down Delay (ms): 0
+Peer Notification Delay (ms): 0
+
+Slave Interface: eth0
+MII Status: up
+Speed: 100 Mbps
+Duplex: full
+Link Failure Count: 0
+Permanent HW addr: 22:22:22:22:22:22
+Slave queue ID: 0
+
+Slave Interface: wlan0
+MII Status: up
+Speed: Unknown
+Duplex: Unknown
+Link Failure Count: 0
+Permanent HW addr: 33:33:33:33:33:33
+Slave queue ID: 0
+</code></pre>
+   </div>
+   <strong>
+    Test Bond0 Configuration...
+   </strong>
+   <br/>
+   1. Establish Ping To Google, i.e.
+   <a class="postlink" href="http://www.google.com">
+    www.google.com
+   </a>
+   <br/>
+   2. Pull Ethernet Cable from Pi eth0 port
+   <br/>
+   3. Ping
+   <em>
+    Should Not Stop
+   </em>
+   Responding
+   <br/>
+   4. Bond Ethernet Adapter Should Be State Down, i.e. use cat /proc/net/network/bonding
+   <br/>
+   5. Insert Ethernet Cable
+   <br/>
+   6. Bond Ethernet Adapter Should Be State Up, i.e. use cat /proc/net/network/bonding
+   <br/>
+   7. Active Bond Slave Should Be Ethernet Adapter Again
+  </div>
+ </body>
+</html>
